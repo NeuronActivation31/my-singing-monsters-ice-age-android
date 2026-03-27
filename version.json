@@ -1,6 +1,6 @@
 {
     "version": "1.1",
-    "download_url": "https://YOUR_HOST_HERE/game.py",
+    "download_url": "https://raw.githubusercontent.com/NeuronActivation31/my-singing-monsters/master/game.py",
     "notes": "Latest version of My Singing Monsters - Ice Age",
     "release_date": "2026-03-27"
 }

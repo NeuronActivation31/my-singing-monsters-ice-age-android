@@ -22,7 +22,7 @@ GAME_VERSION = "1.1"
 #   GitHub raw:   "https://raw.githubusercontent.com/USER/REPO/main/version.json"
 #   Dropbox:      "https://dl.dropboxusercontent.com/s/xxx/version.json"
 #   Your server:  "https://yoursite.com/game/version.json"
-UPDATE_CHECK_URL = ""  # <-- PUT YOUR VERSION.JSON URL HERE
+UPDATE_CHECK_URL = "https://raw.githubusercontent.com/NeuronActivation31/my-singing-monsters/master/version.json"
 update_available = False
 update_info = None
 update_checking = False
