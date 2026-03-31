@@ -31,7 +31,7 @@ fullscreen = 1
 android.entrypoint = game_android
 
 # (list) Permissions
-android.permissions = INTERNET, ACCESS_NETWORK_STATE
+android.permissions = INTERNET, ACCESS_NETWORK_STATE, WAKE_LOCK, VIBRATE
 
 # (int) Target Android API, should be as high as possible.
 android.api = 33
