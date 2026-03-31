@@ -14,6 +14,7 @@ import subprocess
 import tempfile
 import shutil
 import sys
+import platform
 
 # ============ UPDATE SYSTEM ============
 GAME_VERSION = "1.1"
@@ -31,11 +32,12 @@ update_progress = 0
 update_error = None
 update_download_url = None
 
-# Prevent multiple instances
-mutex = ctypes.windll.kernel32.CreateMutexW(None, True, "MySingingMonstersIceAgeMutex")
-if ctypes.windll.kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
-    ctypes.windll.user32.MessageBoxW(0, "Game is already running!", "My Singing Monsters", 0)
-    exit()
+# Prevent multiple instances (Windows only)
+if platform.system() == 'Windows':
+    mutex = ctypes.windll.kernel32.CreateMutexW(None, True, "MySingingMonstersIceAgeMutex")
+    if ctypes.windll.kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
+        ctypes.windll.user32.MessageBoxW(0, "Game is already running!", "My Singing Monsters", 0)
+        exit()
 
 # Initialize pygame
 pygame.init()
@@ -46,7 +48,7 @@ WIDTH, HEIGHT = 800, 600
 DISPLAY_MODE_WINDOWED = 0
 DISPLAY_MODE_BORDERLESS = 1
 DISPLAY_MODE_FULLSCREEN = 2
-display_mode = DISPLAY_MODE_WINDOWED
+display_mode = DISPLAY_MODE_FULLSCREEN if (platform.system() == 'Linux' and 'ANDROID_DATA' in os.environ) else DISPLAY_MODE_WINDOWED
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("My Singing Monsters - Ice Age")
 game_surface = pygame.Surface((WIDTH, HEIGHT))
@@ -208,7 +210,18 @@ score = 0
 clock = pygame.time.Clock()
 volume = 0.7
 last_save_time = time.time()
-SAVE_FILE = os.path.join(os.path.expanduser("~"), "Documents", "My Singing Monsters", "save.json")
+# Determine save file path based on platform
+if platform.system() == 'Linux' and 'ANDROID_DATA' in os.environ:
+    # Android
+    try:
+        from android import get_external_files_dir
+        save_dir = get_external_files_dir()
+    except ImportError:
+        save_dir = os.path.join(os.path.expanduser("~"), ".MySingingMonsters")
+else:
+    # Desktop
+    save_dir = os.path.join(os.path.expanduser("~"), "Documents", "My Singing Monsters")
+SAVE_FILE = os.path.join(save_dir, "save.json")
 
 def save_game():
     global last_save_time
@@ -1866,482 +1879,483 @@ def draw_languages(surface):
     # Back button
     btn_back.draw(surface)
 
-# Load saved game
-load_game()
-
-# Apply display mode if saved
-apply_display_mode()
-
-# Update button texts based on loaded language
-btn_play.text = t("play")
-btn_settings.text = t("settings")
-btn_credits.text = t("credits")
-btn_quit.text = t("quit")
-btn_back.text = t("back")
-btn_languages.text = t("languages")
-update_fullscreen_button_text()
-btn_updates.text = t("check_updates")
-btn_update_download.text = t("update_download")
-
-# Check for updates in background on startup
-if UPDATE_CHECK_URL:
-    start_update_check()
-
-# Main game loop
-running = True
-mouse_pressed = False
-
-while running:
-    raw_mouse_pos = pygame.mouse.get_pos()
-    # Scale mouse position to game coordinates when not windowed
-    if display_mode != DISPLAY_MODE_WINDOWED:
-        sw, sh = screen.get_size()
-        mouse_pos = (int(raw_mouse_pos[0] * WIDTH / sw), int(raw_mouse_pos[1] * HEIGHT / sh))
-    else:
-        mouse_pos = raw_mouse_pos
-    mouse_pressed_this_frame = False
-
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            save_game()
-            running = False
-        elif event.type == pygame.MOUSEBUTTONDOWN:
-            mouse_pressed = True
-            mouse_pressed_this_frame = True
-        elif event.type == pygame.MOUSEBUTTONUP:
-            mouse_pressed = False
-            dragging_volume = False
-        elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_F11:
-                play_click()
-                toggle_fullscreen()
-
-    # === MENU STATE ===
-    if current_state == STATE_MENU:
-        btn_play.update(mouse_pos, mouse_pressed)
-        btn_settings.update(mouse_pos, mouse_pressed)
-        btn_credits.update(mouse_pos, mouse_pressed)
-        btn_quit.update(mouse_pos, mouse_pressed)
-        btn_languages.update(mouse_pos, mouse_pressed)
-
-        if mouse_pressed_this_frame:
-            if btn_play.hovered:
-                play_click()
-                current_state = STATE_PLAY
-                fade_alpha = 255
-            elif btn_settings.hovered:
-                play_click()
-                current_state = STATE_SETTINGS
-            elif btn_credits.hovered:
-                play_click()
-                current_state = STATE_CREDITS
-            elif btn_languages.hovered:
-                play_click()
-                current_state = STATE_LANGUAGES
-            elif btn_quit.hovered:
-                play_click()
+if __name__ == "__main__":
+    # Load saved game
+    load_game()
+    
+    # Apply display mode if saved
+    apply_display_mode()
+    
+    # Update button texts based on loaded language
+    btn_play.text = t("play")
+    btn_settings.text = t("settings")
+    btn_credits.text = t("credits")
+    btn_quit.text = t("quit")
+    btn_back.text = t("back")
+    btn_languages.text = t("languages")
+    update_fullscreen_button_text()
+    btn_updates.text = t("check_updates")
+    btn_update_download.text = t("update_download")
+    
+    # Check for updates in background on startup
+    if UPDATE_CHECK_URL:
+        start_update_check()
+    
+    # Main game loop
+    running = True
+    mouse_pressed = False
+    
+    while running:
+        raw_mouse_pos = pygame.mouse.get_pos()
+        # Scale mouse position to game coordinates when not windowed
+        if display_mode != DISPLAY_MODE_WINDOWED:
+            sw, sh = screen.get_size()
+            mouse_pos = (int(raw_mouse_pos[0] * WIDTH / sw), int(raw_mouse_pos[1] * HEIGHT / sh))
+        else:
+            mouse_pos = raw_mouse_pos
+        mouse_pressed_this_frame = False
+    
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
                 save_game()
                 running = False
-
-        draw_menu(game_surface)
-        btn_play.draw(game_surface)
-        btn_settings.draw(game_surface)
-        btn_credits.draw(game_surface)
-        btn_quit.draw(game_surface)
-        btn_languages.draw(game_surface)
-
-    # === SETTINGS STATE ===
-    elif current_state == STATE_SETTINGS:
-        btn_back.update(mouse_pos, mouse_pressed)
-        btn_fullscreen.update(mouse_pos, mouse_pressed)
-        btn_updates.update(mouse_pos, mouse_pressed)
-
-        # Volume slider
-        if mouse_pressed:
-            if vol_slider_rect.collidepoint(mouse_pos) or dragging_volume:
-                dragging_volume = True
-                vol_handle_x = max(vol_slider_rect.x, min(mouse_pos[0], vol_slider_rect.right))
-                volume = (vol_handle_x - vol_slider_rect.x) / vol_slider_rect.width
-
-        if mouse_pressed_this_frame:
-            if btn_back.hovered:
-                play_click()
-                current_state = STATE_MENU
-            elif btn_fullscreen.hovered:
-                play_click()
-                toggle_fullscreen()
-            elif btn_updates.hovered:
-                play_click()
-                update_checking = True
-                update_error = None
-                start_update_check()
-                current_state = STATE_UPDATES
-
-        draw_settings(game_surface)
-
-    # === CREDITS STATE ===
-    elif current_state == STATE_CREDITS:
-        btn_back.update(mouse_pos, mouse_pressed)
-
-        if mouse_pressed_this_frame:
-            if btn_back.hovered:
-                play_click()
-                current_state = STATE_MENU
-
-        draw_credits(game_surface)
-
-    # === LANGUAGES STATE ===
-    elif current_state == STATE_LANGUAGES:
-        btn_back.update(mouse_pos, mouse_pressed)
-
-        if mouse_pressed_this_frame:
-            if btn_back.hovered:
-                play_click()
-                current_state = STATE_MENU
-            else:
-                for code, btn in lang_buttons:
-                    if btn.hovered:
-                        play_click()
-                        current_lang = code
-                        # Update button texts
-                        btn_play.text = t("play")
-                        btn_settings.text = t("settings")
-                        btn_credits.text = t("credits")
-                        btn_quit.text = t("quit")
-                        btn_back.text = t("back")
-                        btn_languages.text = t("languages")
-                        update_fullscreen_button_text()
-
-        draw_languages(game_surface)
-
-    # === SHOP STATE ===
-    elif current_state == STATE_SHOP:
-        btn_back.update(mouse_pos, mouse_pressed)
-
-        if mouse_pressed_this_frame:
-            if btn_back.hovered:
-                play_click()
-                current_state = STATE_PLAY
-            # Check if clicking on top hat upgrade (y: 170-240)
-            elif 200 <= mouse_pos[0] <= 600 and 170 <= mouse_pos[1] <= 240:
-                if not upgrades.get("orange_top_hat", False):
-                    if coins >= 50:
-                        play_click()
-                        coins -= 50
-                        upgrades["orange_top_hat"] = True
-                    else:
-                        play_click()
-            # Check if clicking on dockyard upgrade (y: 260-330)
-            elif 200 <= mouse_pos[0] <= 600 and 260 <= mouse_pos[1] <= 330:
-                if not upgrades.get("dockyard", False):
-                    if coins >= 100:
-                        play_click()
-                        coins -= 100
-                        upgrades["dockyard"] = True
-                    else:
-                        play_click()
-            # Check if clicking on breeding structure upgrade (y: 350-420)
-            elif 200 <= mouse_pos[0] <= 600 and 350 <= mouse_pos[1] <= 420:
-                if not upgrades.get("breeding_structure", False):
-                    if coins >= 200:
-                        play_click()
-                        coins -= 200
-                        upgrades["breeding_structure"] = True
-                    else:
-                        play_click()
-
-        draw_shop(game_surface)
-
-    # === PLAY STATE ===
-    elif current_state == STATE_PLAY:
-        if mouse_pressed_this_frame:
-            pos = mouse_pos
-
-            # Check menu button
-            menu_btn = pygame.Rect(WIDTH//2 - 50, 8, 100, 34)
-            if menu_btn.collidepoint(pos):
-                play_click()
-                current_state = STATE_MENU
-                continue
-
-            # Check house click (shop)
-            house_rect = pygame.Rect(355, 280, 90, 55)
-            if house_rect.collidepoint(pos):
-                play_click()
-                current_state = STATE_SHOP
-                continue
-
-            # Check breeding structure click
-            if upgrades.get("breeding_structure", False):
-                breed_rect = pygame.Rect(585, 280, 70, 70)
-                if breed_rect.collidepoint(pos):
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_pressed = True
+                mouse_pressed_this_frame = True
+            elif event.type == pygame.MOUSEBUTTONUP:
+                mouse_pressed = False
+                dragging_volume = False
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_F11:
                     play_click()
-                    breeding_selected = [None, None]
-                    current_state = STATE_BREEDING
+                    toggle_fullscreen()
+    
+        # === MENU STATE ===
+        if current_state == STATE_MENU:
+            btn_play.update(mouse_pos, mouse_pressed)
+            btn_settings.update(mouse_pos, mouse_pressed)
+            btn_credits.update(mouse_pos, mouse_pressed)
+            btn_quit.update(mouse_pos, mouse_pressed)
+            btn_languages.update(mouse_pos, mouse_pressed)
+    
+            if mouse_pressed_this_frame:
+                if btn_play.hovered:
+                    play_click()
+                    current_state = STATE_PLAY
+                    fade_alpha = 255
+                elif btn_settings.hovered:
+                    play_click()
+                    current_state = STATE_SETTINGS
+                elif btn_credits.hovered:
+                    play_click()
+                    current_state = STATE_CREDITS
+                elif btn_languages.hovered:
+                    play_click()
+                    current_state = STATE_LANGUAGES
+                elif btn_quit.hovered:
+                    play_click()
+                    save_game()
+                    running = False
+    
+            draw_menu(game_surface)
+            btn_play.draw(game_surface)
+            btn_settings.draw(game_surface)
+            btn_credits.draw(game_surface)
+            btn_quit.draw(game_surface)
+            btn_languages.draw(game_surface)
+    
+        # === SETTINGS STATE ===
+        elif current_state == STATE_SETTINGS:
+            btn_back.update(mouse_pos, mouse_pressed)
+            btn_fullscreen.update(mouse_pos, mouse_pressed)
+            btn_updates.update(mouse_pos, mouse_pressed)
+    
+            # Volume slider
+            if mouse_pressed:
+                if vol_slider_rect.collidepoint(mouse_pos) or dragging_volume:
+                    dragging_volume = True
+                    vol_handle_x = max(vol_slider_rect.x, min(mouse_pos[0], vol_slider_rect.right))
+                    volume = (vol_handle_x - vol_slider_rect.x) / vol_slider_rect.width
+    
+            if mouse_pressed_this_frame:
+                if btn_back.hovered:
+                    play_click()
+                    current_state = STATE_MENU
+                elif btn_fullscreen.hovered:
+                    play_click()
+                    toggle_fullscreen()
+                elif btn_updates.hovered:
+                    play_click()
+                    update_checking = True
+                    update_error = None
+                    start_update_check()
+                    current_state = STATE_UPDATES
+    
+            draw_settings(game_surface)
+    
+        # === CREDITS STATE ===
+        elif current_state == STATE_CREDITS:
+            btn_back.update(mouse_pos, mouse_pressed)
+    
+            if mouse_pressed_this_frame:
+                if btn_back.hovered:
+                    play_click()
+                    current_state = STATE_MENU
+    
+            draw_credits(game_surface)
+    
+        # === LANGUAGES STATE ===
+        elif current_state == STATE_LANGUAGES:
+            btn_back.update(mouse_pos, mouse_pressed)
+    
+            if mouse_pressed_this_frame:
+                if btn_back.hovered:
+                    play_click()
+                    current_state = STATE_MENU
+                else:
+                    for code, btn in lang_buttons:
+                        if btn.hovered:
+                            play_click()
+                            current_lang = code
+                            # Update button texts
+                            btn_play.text = t("play")
+                            btn_settings.text = t("settings")
+                            btn_credits.text = t("credits")
+                            btn_quit.text = t("quit")
+                            btn_back.text = t("back")
+                            btn_languages.text = t("languages")
+                            update_fullscreen_button_text()
+    
+            draw_languages(game_surface)
+    
+        # === SHOP STATE ===
+        elif current_state == STATE_SHOP:
+            btn_back.update(mouse_pos, mouse_pressed)
+    
+            if mouse_pressed_this_frame:
+                if btn_back.hovered:
+                    play_click()
+                    current_state = STATE_PLAY
+                # Check if clicking on top hat upgrade (y: 170-240)
+                elif 200 <= mouse_pos[0] <= 600 and 170 <= mouse_pos[1] <= 240:
+                    if not upgrades.get("orange_top_hat", False):
+                        if coins >= 50:
+                            play_click()
+                            coins -= 50
+                            upgrades["orange_top_hat"] = True
+                        else:
+                            play_click()
+                # Check if clicking on dockyard upgrade (y: 260-330)
+                elif 200 <= mouse_pos[0] <= 600 and 260 <= mouse_pos[1] <= 330:
+                    if not upgrades.get("dockyard", False):
+                        if coins >= 100:
+                            play_click()
+                            coins -= 100
+                            upgrades["dockyard"] = True
+                        else:
+                            play_click()
+                # Check if clicking on breeding structure upgrade (y: 350-420)
+                elif 200 <= mouse_pos[0] <= 600 and 350 <= mouse_pos[1] <= 420:
+                    if not upgrades.get("breeding_structure", False):
+                        if coins >= 200:
+                            play_click()
+                            coins -= 200
+                            upgrades["breeding_structure"] = True
+                        else:
+                            play_click()
+    
+            draw_shop(game_surface)
+    
+        # === PLAY STATE ===
+        elif current_state == STATE_PLAY:
+            if mouse_pressed_this_frame:
+                pos = mouse_pos
+    
+                # Check menu button
+                menu_btn = pygame.Rect(WIDTH//2 - 50, 8, 100, 34)
+                if menu_btn.collidepoint(pos):
+                    play_click()
+                    current_state = STATE_MENU
                     continue
-
-            for monster in monsters:
-                if monster.is_clicked(pos):
-                    if monster.on_click():
-                        coins += 10
-                        score += 100
-                        add_particle(pos[0], pos[1], "+10")
-
-        # Update
-        for cloud in clouds:
-            cloud["x"] += cloud["speed"]
-            if cloud["x"] > WIDTH + 50:
-                cloud["x"] = -50
-
-        for monster in monsters:
-            monster.update()
-
-        # Draw
-        draw_sky(game_surface)
-        draw_sun(game_surface)
-
-        for cloud in clouds:
-            draw_cloud(game_surface, cloud["x"], cloud["y"], cloud["size"])
-
-        draw_island(game_surface)
-        draw_tree(game_surface, 130, 350)
-        draw_tree(game_surface, 670, 340)
-
-        for monster in sorted(monsters, key=lambda m: m.y):
-            monster.draw(game_surface)
-
-        update_particles(game_surface)
-        draw_game_ui(game_surface, coins, score)
-
-    # === BREEDING STATE ===
-    elif current_state == STATE_BREEDING:
-        btn_back.update(mouse_pos, mouse_pressed)
-
-        if mouse_pressed_this_frame:
-            if btn_back.hovered:
-                play_click()
-                current_state = STATE_PLAY
-                breeding_selected = [None, None]
-            else:
-                # Check if clicking on a monster to select
-                for i, monster in enumerate(monsters):
-                    if monster.is_clicked(mouse_pos):
+    
+                # Check house click (shop)
+                house_rect = pygame.Rect(355, 280, 90, 55)
+                if house_rect.collidepoint(pos):
+                    play_click()
+                    current_state = STATE_SHOP
+                    continue
+    
+                # Check breeding structure click
+                if upgrades.get("breeding_structure", False):
+                    breed_rect = pygame.Rect(585, 280, 70, 70)
+                    if breed_rect.collidepoint(pos):
                         play_click()
-                        if breeding_selected[0] is None:
-                            breeding_selected[0] = i
-                        elif breeding_selected[1] is None and breeding_selected[0] != i:
-                            breeding_selected[1] = i
-                            # Start breeding
-                            if coins >= breeding_cost:
-                                coins -= breeding_cost
-                                breeding_timer = 180  # 3 seconds at 60 FPS
-                                # Determine result based on parent colors
-                                parent1_name = monsters[breeding_selected[0]].name
-                                parent2_name = monsters[breeding_selected[1]].name
-                                # Sort names to match combination key
-                                key = tuple(sorted([parent1_name, parent2_name]))
-                                if key in breeding_combinations:
-                                    color, color_dark, baby_name = breeding_combinations[key]
-                                    breeding_result = (color, color_dark, baby_name)
-                                else:
-                                    # Fallback: blend colors
-                                    c1 = monsters[breeding_selected[0]].color
-                                    c2 = monsters[breeding_selected[1]].color
-                                    color = ((c1[0] + c2[0]) // 2, (c1[1] + c2[1]) // 2, (c1[2] + c2[2]) // 2)
-                                    color_dark = (int(color[0] * 0.8), int(color[1] * 0.8), int(color[2] * 0.8))
-                                    breeding_result = (color, color_dark, "baby")
-                        break
-
-        # Update breeding timer
-        if breeding_timer > 0:
-            breeding_timer -= 1
-            if breeding_timer == 0 and breeding_result:
-                # Spawn baby monster
-                color, color_dark, baby_name = breeding_result
-                # Find empty spot on island
-                baby_x = random.randint(150, 650)
-                baby_y = random.randint(380, 450)
-                baby_monster = Monster(baby_x, baby_y, color, color_dark, random.randint(0, 3), baby_name)
-                baby_monster.size = 0.6  # Babies start smaller
-                monsters.append(baby_monster)
-                breeding_babies.append(len(monsters) - 1)
-                breeding_selected = [None, None]
-                breeding_result = None
-                add_particle(WIDTH // 2, HEIGHT // 2, t("breeding_baby"), (255, 200, 220))
-
-        # Draw breeding UI
-        draw_sky(game_surface)
-        draw_sun(game_surface)
-        for cloud in clouds:
-            draw_cloud(game_surface, cloud["x"], cloud["y"], cloud["size"])
-        draw_island(game_surface)
-        draw_tree(game_surface, 130, 350)
-        draw_tree(game_surface, 670, 340)
-
-        for monster in sorted(monsters, key=lambda m: m.y):
-            monster.draw(game_surface)
-
-        # Dark overlay
-        overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
-        pygame.draw.rect(overlay, (0, 0, 0, 180), (0, 0, WIDTH, HEIGHT))
-        game_surface.blit(overlay, (0, 0))
-
-        # Breeding panel
-        panel = pygame.Surface((500, 400), pygame.SRCALPHA)
-        pygame.draw.rect(panel, (40, 60, 100, 240), (0, 0, 500, 400), border_radius=20)
-        pygame.draw.rect(panel, (220, 100, 150), (0, 0, 500, 400), 3, border_radius=20)
-        game_surface.blit(panel, (150, 100))
-
-        # Title
-        title = font_large.render(t("breeding").upper(), True, (255, 180, 200))
-        game_surface.blit(title, (WIDTH // 2 - title.get_width() // 2, 120))
-
-        # Cost display
-        cost_text = font_small.render(t("breeding_cost"), True, WHITE)
-        game_surface.blit(cost_text, (WIDTH // 2 - cost_text.get_width() // 2, 170))
-
-        # Coin display
-        pygame.draw.circle(game_surface, GOLD, (200, 200), 12)
-        pygame.draw.circle(game_surface, (200, 170, 0), (200, 200), 12, 2)
-        coin_text = font_small.render(str(coins), True, WHITE)
-        game_surface.blit(coin_text, (218, 190))
-
-        # Parent slots
-        slot_y = 230
-        for i in range(2):
-            slot_x = 250 + i * 150
-            # Slot background
-            slot_color = (220, 100, 150) if breeding_selected[i] is not None else (60, 80, 120)
-            pygame.draw.rect(game_surface, slot_color, (slot_x - 50, slot_y, 100, 100), border_radius=15)
-            pygame.draw.rect(game_surface, (180, 140, 255), (slot_x - 50, slot_y, 100, 100), 2, border_radius=15)
-
-            if breeding_selected[i] is not None:
-                # Draw mini monster preview
-                monster = monsters[breeding_selected[i]]
-                pygame.draw.ellipse(game_surface, monster.color, (slot_x - 25, slot_y + 20, 50, 40))
-                pygame.draw.ellipse(game_surface, monster.color_dark, (slot_x - 25, slot_y + 20, 50, 40), 2)
-                pygame.draw.circle(game_surface, WHITE, (slot_x - 8, slot_y + 30), 6)
-                pygame.draw.circle(game_surface, WHITE, (slot_x + 8, slot_y + 30), 6)
-                pygame.draw.circle(game_surface, BLACK, (slot_x - 6, slot_y + 32), 3)
-                pygame.draw.circle(game_surface, BLACK, (slot_x + 10, slot_y + 32), 3)
+                        breeding_selected = [None, None]
+                        current_state = STATE_BREEDING
+                        continue
+    
+                for monster in monsters:
+                    if monster.is_clicked(pos):
+                        if monster.on_click():
+                            coins += 10
+                            score += 100
+                            add_particle(pos[0], pos[1], "+10")
+    
+            # Update
+            for cloud in clouds:
+                cloud["x"] += cloud["speed"]
+                if cloud["x"] > WIDTH + 50:
+                    cloud["x"] = -50
+    
+            for monster in monsters:
+                monster.update()
+    
+            # Draw
+            draw_sky(game_surface)
+            draw_sun(game_surface)
+    
+            for cloud in clouds:
+                draw_cloud(game_surface, cloud["x"], cloud["y"], cloud["size"])
+    
+            draw_island(game_surface)
+            draw_tree(game_surface, 130, 350)
+            draw_tree(game_surface, 670, 340)
+    
+            for monster in sorted(monsters, key=lambda m: m.y):
+                monster.draw(game_surface)
+    
+            update_particles(game_surface)
+            draw_game_ui(game_surface, coins, score)
+    
+        # === BREEDING STATE ===
+        elif current_state == STATE_BREEDING:
+            btn_back.update(mouse_pos, mouse_pressed)
+    
+            if mouse_pressed_this_frame:
+                if btn_back.hovered:
+                    play_click()
+                    current_state = STATE_PLAY
+                    breeding_selected = [None, None]
+                else:
+                    # Check if clicking on a monster to select
+                    for i, monster in enumerate(monsters):
+                        if monster.is_clicked(mouse_pos):
+                            play_click()
+                            if breeding_selected[0] is None:
+                                breeding_selected[0] = i
+                            elif breeding_selected[1] is None and breeding_selected[0] != i:
+                                breeding_selected[1] = i
+                                # Start breeding
+                                if coins >= breeding_cost:
+                                    coins -= breeding_cost
+                                    breeding_timer = 180  # 3 seconds at 60 FPS
+                                    # Determine result based on parent colors
+                                    parent1_name = monsters[breeding_selected[0]].name
+                                    parent2_name = monsters[breeding_selected[1]].name
+                                    # Sort names to match combination key
+                                    key = tuple(sorted([parent1_name, parent2_name]))
+                                    if key in breeding_combinations:
+                                        color, color_dark, baby_name = breeding_combinations[key]
+                                        breeding_result = (color, color_dark, baby_name)
+                                    else:
+                                        # Fallback: blend colors
+                                        c1 = monsters[breeding_selected[0]].color
+                                        c2 = monsters[breeding_selected[1]].color
+                                        color = ((c1[0] + c2[0]) // 2, (c1[1] + c2[1]) // 2, (c1[2] + c2[2]) // 2)
+                                        color_dark = (int(color[0] * 0.8), int(color[1] * 0.8), int(color[2] * 0.8))
+                                        breeding_result = (color, color_dark, "baby")
+                            break
+    
+            # Update breeding timer
+            if breeding_timer > 0:
+                breeding_timer -= 1
+                if breeding_timer == 0 and breeding_result:
+                    # Spawn baby monster
+                    color, color_dark, baby_name = breeding_result
+                    # Find empty spot on island
+                    baby_x = random.randint(150, 650)
+                    baby_y = random.randint(380, 450)
+                    baby_monster = Monster(baby_x, baby_y, color, color_dark, random.randint(0, 3), baby_name)
+                    baby_monster.size = 0.6  # Babies start smaller
+                    monsters.append(baby_monster)
+                    breeding_babies.append(len(monsters) - 1)
+                    breeding_selected = [None, None]
+                    breeding_result = None
+                    add_particle(WIDTH // 2, HEIGHT // 2, t("breeding_baby"), (255, 200, 220))
+    
+            # Draw breeding UI
+            draw_sky(game_surface)
+            draw_sun(game_surface)
+            for cloud in clouds:
+                draw_cloud(game_surface, cloud["x"], cloud["y"], cloud["size"])
+            draw_island(game_surface)
+            draw_tree(game_surface, 130, 350)
+            draw_tree(game_surface, 670, 340)
+    
+            for monster in sorted(monsters, key=lambda m: m.y):
+                monster.draw(game_surface)
+    
+            # Dark overlay
+            overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+            pygame.draw.rect(overlay, (0, 0, 0, 180), (0, 0, WIDTH, HEIGHT))
+            game_surface.blit(overlay, (0, 0))
+    
+            # Breeding panel
+            panel = pygame.Surface((500, 400), pygame.SRCALPHA)
+            pygame.draw.rect(panel, (40, 60, 100, 240), (0, 0, 500, 400), border_radius=20)
+            pygame.draw.rect(panel, (220, 100, 150), (0, 0, 500, 400), 3, border_radius=20)
+            game_surface.blit(panel, (150, 100))
+    
+            # Title
+            title = font_large.render(t("breeding").upper(), True, (255, 180, 200))
+            game_surface.blit(title, (WIDTH // 2 - title.get_width() // 2, 120))
+    
+            # Cost display
+            cost_text = font_small.render(t("breeding_cost"), True, WHITE)
+            game_surface.blit(cost_text, (WIDTH // 2 - cost_text.get_width() // 2, 170))
+    
+            # Coin display
+            pygame.draw.circle(game_surface, GOLD, (200, 200), 12)
+            pygame.draw.circle(game_surface, (200, 170, 0), (200, 200), 12, 2)
+            coin_text = font_small.render(str(coins), True, WHITE)
+            game_surface.blit(coin_text, (218, 190))
+    
+            # Parent slots
+            slot_y = 230
+            for i in range(2):
+                slot_x = 250 + i * 150
+                # Slot background
+                slot_color = (220, 100, 150) if breeding_selected[i] is not None else (60, 80, 120)
+                pygame.draw.rect(game_surface, slot_color, (slot_x - 50, slot_y, 100, 100), border_radius=15)
+                pygame.draw.rect(game_surface, (180, 140, 255), (slot_x - 50, slot_y, 100, 100), 2, border_radius=15)
+    
+                if breeding_selected[i] is not None:
+                    # Draw mini monster preview
+                    monster = monsters[breeding_selected[i]]
+                    pygame.draw.ellipse(game_surface, monster.color, (slot_x - 25, slot_y + 20, 50, 40))
+                    pygame.draw.ellipse(game_surface, monster.color_dark, (slot_x - 25, slot_y + 20, 50, 40), 2)
+                    pygame.draw.circle(game_surface, WHITE, (slot_x - 8, slot_y + 30), 6)
+                    pygame.draw.circle(game_surface, WHITE, (slot_x + 8, slot_y + 30), 6)
+                    pygame.draw.circle(game_surface, BLACK, (slot_x - 6, slot_y + 32), 3)
+                    pygame.draw.circle(game_surface, BLACK, (slot_x + 10, slot_y + 32), 3)
+                else:
+                    # Empty slot
+                    label = t(f"breeding_select_{'first' if i == 0 else 'second'}")
+                    label_text = font_tiny.render(label, True, (150, 200, 240))
+                    game_surface.blit(label_text, (slot_x - label_text.get_width() // 2, slot_y + 40))
+    
+            # Breeding progress
+            if breeding_timer > 0:
+                progress_text = font_medium.render(t("breeding_busy"), True, (255, 200, 220))
+                game_surface.blit(progress_text, (WIDTH // 2 - progress_text.get_width() // 2, 360))
+                # Progress bar
+                bar_width = 300
+                bar_height = 20
+                bar_x = WIDTH // 2 - bar_width // 2
+                bar_y = 400
+                pygame.draw.rect(game_surface, (40, 60, 100), (bar_x, bar_y, bar_width, bar_height), border_radius=10)
+                progress = 1 - (breeding_timer / 180)
+                fill_width = int(bar_width * progress)
+                pygame.draw.rect(game_surface, (220, 100, 150), (bar_x, bar_y, fill_width, bar_height), border_radius=10)
+                pygame.draw.rect(game_surface, (180, 140, 255), (bar_x, bar_y, bar_width, bar_height), 2, border_radius=10)
+            elif breeding_selected[0] is not None and breeding_selected[1] is not None:
+                # Both selected, ready to breed
+                ready_text = font_medium.render(t("breeding_select"), True, (100, 255, 150))
+                game_surface.blit(ready_text, (WIDTH // 2 - ready_text.get_width() // 2, 360))
             else:
-                # Empty slot
-                label = t(f"breeding_select_{'first' if i == 0 else 'second'}")
-                label_text = font_tiny.render(label, True, (150, 200, 240))
-                game_surface.blit(label_text, (slot_x - label_text.get_width() // 2, slot_y + 40))
-
-        # Breeding progress
-        if breeding_timer > 0:
-            progress_text = font_medium.render(t("breeding_busy"), True, (255, 200, 220))
-            game_surface.blit(progress_text, (WIDTH // 2 - progress_text.get_width() // 2, 360))
-            # Progress bar
-            bar_width = 300
-            bar_height = 20
-            bar_x = WIDTH // 2 - bar_width // 2
-            bar_y = 400
-            pygame.draw.rect(game_surface, (40, 60, 100), (bar_x, bar_y, bar_width, bar_height), border_radius=10)
-            progress = 1 - (breeding_timer / 180)
-            fill_width = int(bar_width * progress)
-            pygame.draw.rect(game_surface, (220, 100, 150), (bar_x, bar_y, fill_width, bar_height), border_radius=10)
-            pygame.draw.rect(game_surface, (180, 140, 255), (bar_x, bar_y, bar_width, bar_height), 2, border_radius=10)
-        elif breeding_selected[0] is not None and breeding_selected[1] is not None:
-            # Both selected, ready to breed
-            ready_text = font_medium.render(t("breeding_select"), True, (100, 255, 150))
-            game_surface.blit(ready_text, (WIDTH // 2 - ready_text.get_width() // 2, 360))
-        else:
-            # Instructions
-            instruct_text = font_small.render(t("breeding_select"), True, (180, 200, 220))
-            game_surface.blit(instruct_text, (WIDTH // 2 - instruct_text.get_width() // 2, 360))
-
-        btn_back.draw(game_surface)
-        update_particles(game_surface)
-
-    # === UPDATES STATE ===
-    elif current_state == STATE_UPDATES:
-        btn_back.update(mouse_pos, mouse_pressed)
-        if update_available:
-            btn_update_download.update(mouse_pos, mouse_pressed)
-
-        if mouse_pressed_this_frame:
-            if btn_back.hovered:
-                play_click()
-                current_state = STATE_SETTINGS
-            elif update_available and btn_update_download.hovered and not update_downloading:
-                play_click()
-                start_update_download()
-
-        # Draw update screen
-        draw_menu_background(game_surface)
-        for p in snowflakes[:40]:
-            p.update()
-            p.draw(game_surface)
-
-        title = font_large.render(t("check_updates").upper(), True, FROST_WHITE)
-        game_surface.blit(title, (WIDTH//2 - title.get_width()//2, 100))
-
-        if update_checking:
-            status_text = font_medium.render(t("update_checking"), True, ICE_LIGHT)
-            game_surface.blit(status_text, (WIDTH//2 - status_text.get_width()//2, 250))
-        elif update_downloading:
-            pct = int(update_progress * 100)
-            status_text = font_medium.render(t("update_downloading").format(pct=pct), True, ICE_LIGHT)
-            game_surface.blit(status_text, (WIDTH//2 - status_text.get_width()//2, 250))
-            # Progress bar
-            bar_width = 400
-            bar_height = 25
-            bar_x = WIDTH//2 - bar_width//2
-            bar_y = 310
-            pygame.draw.rect(game_surface, (30, 50, 80), (bar_x, bar_y, bar_width, bar_height), border_radius=12)
-            fill_w = int(bar_width * update_progress)
-            pygame.draw.rect(game_surface, ICE_LIGHT, (bar_x, bar_y, fill_w, bar_height), border_radius=12)
-            pygame.draw.rect(game_surface, ICE_BLUE, (bar_x, bar_y, bar_width, bar_height), 2, border_radius=12)
-        elif update_available:
-            avail_text = font_large.render(t("update_available"), True, (100, 255, 150))
-            game_surface.blit(avail_text, (WIDTH//2 - avail_text.get_width()//2, 200))
-            if update_info:
-                ver_text = font_medium.render(t("update_version").format(ver=update_info.get("version", "?")), True, WHITE)
-                game_surface.blit(ver_text, (WIDTH//2 - ver_text.get_width()//2, 260))
-                if update_info.get("notes"):
-                    notes_text = font_tiny.render(update_info["notes"], True, (180, 200, 220))
-                    game_surface.blit(notes_text, (WIDTH//2 - notes_text.get_width()//2, 310))
-            btn_update_download.draw(game_surface)
-        elif update_error:
-            if update_error == "no_url":
-                err_text = font_small.render(t("update_no_url"), True, (255, 150, 150))
+                # Instructions
+                instruct_text = font_small.render(t("breeding_select"), True, (180, 200, 220))
+                game_surface.blit(instruct_text, (WIDTH // 2 - instruct_text.get_width() // 2, 360))
+    
+            btn_back.draw(game_surface)
+            update_particles(game_surface)
+    
+        # === UPDATES STATE ===
+        elif current_state == STATE_UPDATES:
+            btn_back.update(mouse_pos, mouse_pressed)
+            if update_available:
+                btn_update_download.update(mouse_pos, mouse_pressed)
+    
+            if mouse_pressed_this_frame:
+                if btn_back.hovered:
+                    play_click()
+                    current_state = STATE_SETTINGS
+                elif update_available and btn_update_download.hovered and not update_downloading:
+                    play_click()
+                    start_update_download()
+    
+            # Draw update screen
+            draw_menu_background(game_surface)
+            for p in snowflakes[:40]:
+                p.update()
+                p.draw(game_surface)
+    
+            title = font_large.render(t("check_updates").upper(), True, FROST_WHITE)
+            game_surface.blit(title, (WIDTH//2 - title.get_width()//2, 100))
+    
+            if update_checking:
+                status_text = font_medium.render(t("update_checking"), True, ICE_LIGHT)
+                game_surface.blit(status_text, (WIDTH//2 - status_text.get_width()//2, 250))
+            elif update_downloading:
+                pct = int(update_progress * 100)
+                status_text = font_medium.render(t("update_downloading").format(pct=pct), True, ICE_LIGHT)
+                game_surface.blit(status_text, (WIDTH//2 - status_text.get_width()//2, 250))
+                # Progress bar
+                bar_width = 400
+                bar_height = 25
+                bar_x = WIDTH//2 - bar_width//2
+                bar_y = 310
+                pygame.draw.rect(game_surface, (30, 50, 80), (bar_x, bar_y, bar_width, bar_height), border_radius=12)
+                fill_w = int(bar_width * update_progress)
+                pygame.draw.rect(game_surface, ICE_LIGHT, (bar_x, bar_y, fill_w, bar_height), border_radius=12)
+                pygame.draw.rect(game_surface, ICE_BLUE, (bar_x, bar_y, bar_width, bar_height), 2, border_radius=12)
+            elif update_available:
+                avail_text = font_large.render(t("update_available"), True, (100, 255, 150))
+                game_surface.blit(avail_text, (WIDTH//2 - avail_text.get_width()//2, 200))
+                if update_info:
+                    ver_text = font_medium.render(t("update_version").format(ver=update_info.get("version", "?")), True, WHITE)
+                    game_surface.blit(ver_text, (WIDTH//2 - ver_text.get_width()//2, 260))
+                    if update_info.get("notes"):
+                        notes_text = font_tiny.render(update_info["notes"], True, (180, 200, 220))
+                        game_surface.blit(notes_text, (WIDTH//2 - notes_text.get_width()//2, 310))
+                btn_update_download.draw(game_surface)
+            elif update_error:
+                if update_error == "no_url":
+                    err_text = font_small.render(t("update_no_url"), True, (255, 150, 150))
+                else:
+                    err_text = font_small.render(t("update_error"), True, (255, 150, 150))
+                game_surface.blit(err_text, (WIDTH//2 - err_text.get_width()//2, 250))
             else:
-                err_text = font_small.render(t("update_error"), True, (255, 150, 150))
-            game_surface.blit(err_text, (WIDTH//2 - err_text.get_width()//2, 250))
+                latest_text = font_medium.render(t("update_latest"), True, (100, 255, 100))
+                game_surface.blit(latest_text, (WIDTH//2 - latest_text.get_width()//2, 250))
+    
+            # Version info
+            ver_info = font_tiny.render(f"v{GAME_VERSION}", True, (100, 150, 200))
+            game_surface.blit(ver_info, (WIDTH//2 - ver_info.get_width()//2, 480))
+    
+            btn_back.draw(game_surface)
+    
+        # Fade transition
+        if fade_alpha > 0:
+            fade_surface = pygame.Surface((WIDTH, HEIGHT))
+            fade_surface.fill(BLACK)
+            fade_surface.set_alpha(fade_alpha)
+            game_surface.blit(fade_surface, (0, 0))
+            fade_alpha -= fade_speed
+    
+        # Scale game to screen when not windowed
+        if display_mode != DISPLAY_MODE_WINDOWED:
+            sw, sh = screen.get_size()
+            scaled = pygame.transform.scale(game_surface, (sw, sh))
+            screen.blit(scaled, (0, 0))
         else:
-            latest_text = font_medium.render(t("update_latest"), True, (100, 255, 100))
-            game_surface.blit(latest_text, (WIDTH//2 - latest_text.get_width()//2, 250))
-
-        # Version info
-        ver_info = font_tiny.render(f"v{GAME_VERSION}", True, (100, 150, 200))
-        game_surface.blit(ver_info, (WIDTH//2 - ver_info.get_width()//2, 480))
-
-        btn_back.draw(game_surface)
-
-    # Fade transition
-    if fade_alpha > 0:
-        fade_surface = pygame.Surface((WIDTH, HEIGHT))
-        fade_surface.fill(BLACK)
-        fade_surface.set_alpha(fade_alpha)
-        game_surface.blit(fade_surface, (0, 0))
-        fade_alpha -= fade_speed
-
-    # Scale game to screen when not windowed
-    if display_mode != DISPLAY_MODE_WINDOWED:
-        sw, sh = screen.get_size()
-        scaled = pygame.transform.scale(game_surface, (sw, sh))
-        screen.blit(scaled, (0, 0))
-    else:
-        screen.blit(game_surface, (0, 0))
-
-    pygame.display.flip()
-    # Auto-save every 10 minutes
-    if time.time() - last_save_time > 600:
-        save_game()
-
-    clock.tick(60)
-
-pygame.quit()
+            screen.blit(game_surface, (0, 0))
+    
+        pygame.display.flip()
+        # Auto-save every 10 minutes
+        if time.time() - last_save_time > 600:
+            save_game()
+    
+        clock.tick(60)
+    
+    pygame.quit()
